@@ -61,6 +61,8 @@ public class HTableIndexCoprocessor extends BaseRegionObserver {
 	private HRegion region;
 	private String regionName;
 
+	private boolean compressindex;
+
 	@Override
 	public void start(CoprocessorEnvironment environment) throws IOException {
 
@@ -100,6 +102,8 @@ public class HTableIndexCoprocessor extends BaseRegionObserver {
 			regionName = region.getRegionNameAsString();
 			LOG.info("INDEX: Starting HTableIndexCoprocessor on region " + "["
 					+ regionName + "]");
+			compressindex = configuration.getBoolean("indexCoprocessor.compressindex", true);
+			LOG.info("indexCoprocessor.compressindex is " + compressindex + ", the index file in HDFS will" + (compressindex?"":" not") +" be compressed." );
 		}
 	}
 
@@ -185,12 +189,20 @@ public class HTableIndexCoprocessor extends BaseRegionObserver {
 		}
 
 		FSDataInputStream in = fs.open(regionIndexPath);
-		SnappyInputStream sis = new SnappyInputStream(in);
-		ObjectInputStream ois = new ObjectInputStream(sis);
+		ObjectInputStream ois;
+
+		if(compressindex)
+		{
+			SnappyInputStream sis = new SnappyInputStream(in);
+			ois = new ObjectInputStream(sis);
+		}
+		else
+			ois = new ObjectInputStream(in);
 
 		RegionIndex regionIndex = (RegionIndex) ois.readObject();
 		RegionIndexMap.getInstance().add(regionName, regionIndex);
 		ois.close();
+		LOG.info("INDEX: Finished loading index for region [" + regionName + "] from file.");
 
 		try {
 			fs.delete(regionIndexPath, false);
@@ -776,8 +788,14 @@ public class HTableIndexCoprocessor extends BaseRegionObserver {
 
 			FSDataOutputStream out = FileSystem.create(fs, regionIndexPath,
 					perms);
-			SnappyOutputStream sos = new SnappyOutputStream(out);
-			ObjectOutputStream oos = new ObjectOutputStream(sos);
+			ObjectOutputStream oos;
+
+			if(compressindex)
+			{
+				SnappyOutputStream sos = new SnappyOutputStream(out);
+				oos = new ObjectOutputStream(sos);
+			}
+			else oos = new ObjectOutputStream(out);
 
 			oos.writeObject(regionIndex);
 			oos.flush();
@@ -798,9 +816,9 @@ public class HTableIndexCoprocessor extends BaseRegionObserver {
 			boolean abortRequested) {
 		if (!doNotRun) {
 			try {
-				LOG.info("INDEX: Region [" + regionName + "] postClose; "
-						+ "persisting region indexes.");
+				LOG.info("INDEX: Region [" + regionName + "] postClose; " + "persisting region indexes.");
 				persistIndexToFS();
+				LOG.info("INDEX: Region [" + regionName + "] postClose; " + "finished persisting region indexes.");
 			} catch (IOException e1) {
 				LOG.error(
 						"INDEX: Failed to persist index to filesystem for region "
@@ -816,10 +834,10 @@ public class HTableIndexCoprocessor extends BaseRegionObserver {
 		// we remove the ref to the memory index, we don't want it persisted
 		// when the region closes due to a split;
 		// the index will be rebuilt when the new regions open.
-		LOG.info("INDEX: Region [" + regionName + "] preSplit; "
-				+ "removing in memory indexes.");
+		LOG.info("INDEX: Region [" + regionName + "] preSplit; " + "removing in memory indexes.");
 		splitAndPersistIndex(splitRow);
 		RegionIndexMap.getInstance().remove(regionName);
+		LOG.info("INDEX: Region [" + regionName + "] preSplit; " + "finished removing in memory indexes.");
 	}
 
 	private void splitAndPersistIndex(byte[] splitRow) {
@@ -880,8 +898,15 @@ public class HTableIndexCoprocessor extends BaseRegionObserver {
 				HConstants.DATA_FILE_UMASK_KEY);
 
 		FSDataOutputStream out = FileSystem.create(fs, regionIndexPath, perms);
-		SnappyOutputStream sos = new SnappyOutputStream(out);
-		ObjectOutputStream oos = new ObjectOutputStream(sos);
+		ObjectOutputStream oos;
+
+		if(compressindex)
+		{
+			SnappyOutputStream sos = new SnappyOutputStream(out);
+			oos = new ObjectOutputStream(sos);
+		}
+		else
+			oos = new ObjectOutputStream(out);
 
 		oos.writeObject(daughterRegionAIndex);
 		oos.flush();

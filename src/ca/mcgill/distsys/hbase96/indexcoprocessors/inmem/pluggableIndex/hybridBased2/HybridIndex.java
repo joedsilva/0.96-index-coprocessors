@@ -16,6 +16,7 @@ import org.apache.hadoop.hbase.regionserver.MultiVersionConsistencyControl;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import javax.xml.bind.DatatypeConverter;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.ObjectInputStream;
@@ -344,11 +345,13 @@ public class HybridIndex extends AbstractPluggableIndex
 					range.getLowerBound());
 			ByteArrayNodeKey higherBound = new ByteArrayNodeKey(
 					range.getHigherBound());
+			//LOG.info("RANGE : lowerbound " + DatatypeConverter.printHexBinary(lowerBound.get()) + " higherbound " +  DatatypeConverter.printHexBinary(higherBound.get())  );
 			List<DeepCopyObject> rangeSet = tree.rangeSearch(lowerBound, true,
 					higherBound, true);
 			for (DeepCopyObject singleRowIndex : rangeSet) {
-				rowKeys.addAll(((ByteArrayNodeValue) singleRowIndex)
-						.getPKRefs());
+				if(singleRowIndex != null)
+					rowKeys.addAll(((ByteArrayNodeValue) singleRowIndex).getPKRefs());
+				else LOG.warn("WARN range search returned nulls too..");
 			}
 			rwLock.readLock().unlock();
 			return rowKeys;

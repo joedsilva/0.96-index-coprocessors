@@ -10,6 +10,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import ca.mcgill.distsys.hbase96.indexcoprocessors.inmem.pluggableIndex.hybridBased2.test.IntegerNode;
 import ca.mcgill.distsys.hbase96.indexcoprocessors.inmem.pluggableIndex.hybridBased2.test.StringNode;
+import sun.rmi.log.ReliableLog;
+
+import static org.apache.hadoop.hbase.fs.HFileSystem.LOG;
 
 public class IMBLTree implements Serializable {
 
@@ -19,7 +22,7 @@ public class IMBLTree implements Serializable {
 	private static final long serialVersionUID = -1577995491716001847L;
 
 	/** common interface for BTree node */
-	public interface BNode {
+	public interface BNode extends Serializable {
 		boolean isLeaf();
 
 		Object[] keys();
@@ -208,12 +211,26 @@ public class IMBLTree implements Serializable {
 	}
 
 	@SuppressWarnings("rawtypes")
+	public static class IMBLTreeComparator implements Comparator<Comparable>, Serializable
+	{
+		@Override
+		public int compare(Comparable o1, Comparable o2)
+		{
+			if(o1 == null || o2 == null) { LOG.warn("Nulls for comparison o1 = " + o1 + " o2 = " + o2); }
+			return o1.compareTo(o2);
+		}
+	}
+
+	@SuppressWarnings("rawtypes")
+	public static final Comparator COMPARABLE_COMPARATOR = new IMBLTreeComparator();
+	/*
 	public static final Comparator COMPARABLE_COMPARATOR = new Comparator<Comparable>() {
 		@Override
 		public int compare(Comparable o1, Comparable o2) {
 			return o1.compareTo(o2);
 		}
 	};
+	*/
 
 	BNode rootNode;
 	int maxNodeSize;
@@ -832,8 +849,12 @@ public class IMBLTree implements Serializable {
 		} else { // the same node contains upperBound and lowerBound
 			list.clear();
 			IMBLTNodeContentWrapper wrapper = current.getNodeContent();
+			//LOG.info("wrapper instance is " + wrapper.getClass());
 			int i, j;
-			for (i = 1; i < wrapper.keys().length; i++) {
+
+			for (i = 1; i < wrapper.keys().length; i++)
+			if(wrapper.keys()[i] != null)
+			{
 				if (comparator.compare(wrapper.keys()[i], lowerBound) < 0) {
 					// did nothing
 				} else {

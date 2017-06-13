@@ -166,6 +166,8 @@ public class IndexCoprocessorInMemEndpoint extends IndexCoprocessorInMemService
 			IndexedQueryRequest request,
 			RpcCallback<IndexedQueryResponse> done) {
 
+		//LOG.info("Received request " + request);
+
 		RegionIndexMap rim = RegionIndexMap.getInstance();
 		RegionIndex regionIndex = rim.get(region.getRegionNameAsString());
 

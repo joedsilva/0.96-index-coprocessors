@@ -1,7 +1,9 @@
 package ca.mcgill.distsys.hbase96.indexcoprocessors.inmem.pluggableIndex.hybridBased2;
 import ca.mcgill.distsys.hbase96.indexcoprocessors.inmem.pluggableIndex.hybridBased2.IMBLTree.BNode;
 
-public interface IMBLTNodeContentWrapper {
+import java.io.Serializable;
+
+public interface IMBLTNodeContentWrapper extends Serializable {
 	
 	public boolean isLeaf();
 	 
